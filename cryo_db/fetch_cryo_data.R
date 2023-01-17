@@ -13,7 +13,7 @@ required_packages <-
 packages_loaded <- sapply(required_packages, require, character.only = T)
 
 # Check loading
-if(allTrue(packages_loaded)){
+if(all(packages_loaded)){
   cat("... all packages loaded.\n")
 } else {
   # If not successful install and load packages that failed
@@ -29,6 +29,6 @@ if(allTrue(packages_loaded)){
 }
 
 ## Load site coordinates from ahbddb.txt
-locations <- read.csv("")
+locations <- read.csv("../visualisation/thalloo-static-site/map-data/ahbdb.txt")
 
 test_rast <- rast("/vsicurl/https://os.zhdk.cloud.switch.ch/envicloud/chelsa/chelsa_V1/chelsa_trace/orog/CHELSA_TraCE21k_dem_-100_V1.0.tif")
