@@ -6,34 +6,21 @@
 cat("Loading packages...")
 
 # List of packages
-required_packages <-
-  c("terra",
-    "sf",
-    "dplyr",
-    "tidyr")
+library(terra)
+library(sf)
+library(pbapply)
+library(tidyverse)
 
-# Attempt load
-packages_loaded <- sapply(required_packages, require, character.only = T)
+cat("done.\n")
 
-# Check loading
-if(all(packages_loaded)){
-  cat("... all packages loaded.\n")
-} else {
-  # If not successful install and load packages that failed
-  for(i in length(packages_loaded)){
-    if(!packages_loaded[i]){
-      cat("\nInstalling package", required_packages[i])
-      install.packages(required_packages[i])
-      library(required_packages[i])
-      cat("Success.")
-    }
-  }
-  cat("... all packages installed and loaded.\n")
-}
+# Work relative to cryo_db folder
+# setwd("cryo_db") 
 
 ## Load site coordinates from ahbddb.txt
-ahbdb <- read.csv("../visualisation/thalloo-static-site/map-data/ahbdb.txt",
-                      sep = "\t")
+cat("Loading ahbdb coordinates...")
+ahbdb <- read_delim("../visualisation/thalloo-static-site/map-data/ahbdb.txt",
+                    delim = "\t",
+                    show_col_types = FALSE)
 # Parse and convert as vect
 ahbdb <- st_as_sf(ahbdb, 
                   coords = c("LonDD", "LatDD"), 
@@ -42,10 +29,30 @@ ahbdb <- st_as_sf(ahbdb,
   select(LonDD, LatDD, geometry) %>%
   distinct()
 
+cat("done.\n")
+
 ## Determine subset to extract
+cat("Determining subest to extract...")
+
+# Load already extracted coordinates
+cryo_db <- read_csv("cryo_db.csv",
+                    show_col_types = FALSE) %>%
+  st_as_sf(coords = c("LonDD", "LatDD"), 
+           crs = 4326,
+           remove = F) 
+
+# Determing subset of coordinates to extract
 coords_to_extract <- ahbdb %>%
+  filter(!(geometry %in% unique(cryo_db$geometry))) %>%
+  # Add unique ID column
   mutate(ID = 1:nrow(.))
-  
+
+cat("done.\n")
+
+# Status
+cat("\nExtracting", nrow(coords_to_extract), "new records.",
+    "\nTotal distinct locations in DB:", nrow(ahbdb),".\n\n")
+
 ## Load CHELSA TraCE21k data remotely
 
 # Helper function to parse years into a more readable form
@@ -88,25 +95,17 @@ CHELSA_dem <- read.csv("source_data/CHELSA_TraCE21k_dem.txt") %>%
 names(CHELSA_dem) <- names(CHELSA_dem) %>% parse_year("dem")
 cat("done.\n")  
 
-# Glatial extent
-cat("Loading glacial extent data...")
-CHELSA_gle <- read.csv("source_data/CHELSA_TraCE21k_gle.txt") %>%
-  lapply(function(x) paste0("/vsicurl/", x)) %>%
-  lapply(rast) %>% 
-  rast()
-# Rename gle layers
+# Glacial extent
+cat("Loading glacial extent polygons")
+test <- st_read(paste0("/vsicurl/","https://chartercryodb.s3.eu-central-1.amazonaws.com/CHELSA_TraCE21_gle_geom/CHELSA_TraCE21k_gle_-101_V1.0.gpkg"))
+CHELSA_gle_files <- list.files("source_data/CHELSA_TraCE21_gle_geom/",
+                               full.names = T)
+CHELSA_gle <- CHELSA_gle_files %>%
+  lapply(read_sf) %>%
+  setNames(gsub(".*/(CHELSA_TraCE21k_gle_.*).gpkg", "\\1", CHELSA_gle_files))
+# Rename gle files
 names(CHELSA_gle) <- names(CHELSA_gle) %>% parse_year("gle")
-cat("done.\n")  
-
-# # Glatial elevation
-# cat("Loading glacier elevation data...")
-# CHELSA_glz <- read.csv("source_data/CHELSA_TraCE21k_glz.txt") %>%
-#   lapply(function(x) paste0("/vsicurl/", x)) %>%
-#   lapply(rast) %>% 
-#   rast()
-# # Rename glz layers
-# names(CHELSA_glz) <- names(CHELSA_gle) %>% parse_year("glt")
-# cat("done.\n")  
+cat("done.\n")
 
 ## Load time-step look_up-table
 time_id_look_up <- read.csv("source_data/time_id_look_up.csv")
@@ -118,11 +117,11 @@ look_up_year <- function(time_id_vect){
          })
 }
 
-## Extract temperature, precipitation and eleveation
+## Extract temperature, precipitation and elevation
 
 # Temperature
 cat("Extracting temperature values...")
-croy_db_new_extract <- terra::extract(CHELSA_temp, coords_to_extract[2,]) %>% 
+croy_db_new_extract <- terra::extract(CHELSA_temp, coords_to_extract) %>% 
   pivot_longer(2:ncol(.), 
                               names_to = "year_kBP", 
                               values_to = "CHELSA_TraCE21k_temp") %>% 
@@ -132,7 +131,7 @@ cat("done.\n")
 
 # Precipitation
 cat("Extracting precipitation values...")
-croy_db_new_extract <- terra::extract(CHELSA_precip, coords_to_extract[2,]) %>% 
+croy_db_new_extract <- terra::extract(CHELSA_precip, coords_to_extract) %>% 
   pivot_longer(2:ncol(.), 
                names_to = "year_kBP", 
                values_to = "CHELSA_TraCE21k_precip") %>% 
@@ -143,7 +142,7 @@ cat("done.\n")
 
 # Elevation
 cat("Extracting elevation values...")
-croy_db_new_extract <- terra::extract(CHELSA_dem, coords_to_extract[2,]) %>% 
+croy_db_new_extract <- terra::extract(CHELSA_dem, coords_to_extract) %>% 
   pivot_longer(2:ncol(.), 
                names_to = "year_kBP", 
                values_to = "CHESA_TraCE21k_elevation") %>% 
@@ -152,6 +151,36 @@ croy_db_new_extract <- terra::extract(CHELSA_dem, coords_to_extract[2,]) %>%
   full_join(croy_db_new_extract, .)
 cat("done.\n")  
 
+# Calculate distance to land ice
+cat("Calculating distance glaciers...")
+
+# Helper function for distance calculation
+croy_db_new_extract <- pblapply(seq_along(CHELSA_gle),
+       function(index){
+         # Convert coordinates to extract
+         coords_to_extract_sf <- st_as_sf(coords_to_extract)
+         # Get distances
+         coords_to_extract_sf$CHESA_TraCE21k_dist_to_land_ice <- 
+           st_distance(coords_to_extract_sf, CHELSA_gle[[index]]) %>%
+           as.numeric()
+         # Add year
+         coords_to_extract_sf$year_kBP <- names(CHELSA_gle)[[index]]
+         # Return as data frame
+         coords_to_extract_sf %>%
+           st_drop_geometry() %>%
+           select(-LonDD, LatDD) %>%
+           return()
+       }) %>%
+  reduce(full_join) %>%
+  mutate(year_kBP = gsub("gle_", "", year_kBP)) %>%
+  mutate(year_kBP = look_up_year(year_kBP)) %>%
+  full_join(croy_db_new_extract, .)
+cat("done.\n")
+
+# # Calculate dates last glaciated and date last below sea-level
+# croy_db_new_extract <- croy_db_new_extract %>%
+#   group_by(id) %>%
+  
 ## Add coordinates
 croy_db_new_extract <- coords_to_extract %>%
   st_as_sf() %>%
@@ -163,4 +192,4 @@ croy_db_new_extract <- coords_to_extract %>%
 cryo_db <- bind_rows(croy_db_new_extract)
 
 ## Update database
-write.csv(cryo_db, "cryo_db.csv")
+write_csv(cryo_db, "cryo_db.csv")
