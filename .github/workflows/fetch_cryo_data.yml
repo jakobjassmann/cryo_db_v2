@@ -15,6 +15,11 @@ jobs:
     
     - uses: r-lib/actions/setup-r@v2
     
+    - name: install gdal
+        run: |
+         sudo apt-get update
+         sudo apt-get install gdal-bin 
+    
     - name: Install terra package
       run: R -e 'install.packages("terra")'
     
