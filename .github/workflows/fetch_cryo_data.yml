@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  fetch:
+  cryo_db:
     
     runs-on: ubuntu-latest
     
