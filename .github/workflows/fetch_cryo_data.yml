@@ -18,7 +18,7 @@ jobs:
     - name: install gdal
       run: |
          sudo apt-get update
-         sudo apt-get install gdal-bin 
+         sudo apt-get install gdal-bin libgdal-dev proj-bin libproj-dev proj-data
     
     - name: Install terra package
       run: R -e 'install.packages("terra")'
