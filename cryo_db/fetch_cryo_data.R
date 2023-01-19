@@ -10,6 +10,17 @@ library(terra)
 library(sf)
 library(pbapply)
 library(tidyverse)
+library(parallel)
+
+# Set up parallel environment
+if(Sys.info()['sysname'] == "Windows"){
+  cl <- makeCluster(detectCores() - 1)
+  clusterEvalQ(cl, library(terra))
+  clusterEvalQ(cl, library(sf))
+  clusterEvalQ(cl, library(tidyverse))
+} else {
+  cl <- detectCores() - 1
+}
 
 cat("done.\n")
 
@@ -67,9 +78,9 @@ parse_year <- function(layer_names, var_name, new_var_name = NA){
 
 # Mean temperature per century 
 cat("Loading temperature data...")
-CHELSA_temp <- read.csv("source_data/CHELSA_TraCE21k_bio01.txt") %>%
+CHELSA_temp <- read.csv("source_data/CHELSA_TraCE21k_bio01.txt", header = F) %>%
   lapply(function(x) paste0("/vsicurl/", x)) %>%
-  lapply(rast) %>% 
+  pblapply(rast) %>% 
   rast()
 # Rename temperature layers
 names(CHELSA_temp)<- names(CHELSA_temp) %>% parse_year("bio01", "temp")
@@ -77,9 +88,9 @@ cat("done.\n")
 
 # Mean precipitation per century
 cat("Loading precipitation data...")
-CHELSA_precip <- read.csv("source_data/CHELSA_TraCE21k_bio12.txt") %>%
+CHELSA_precip <- read.csv("source_data/CHELSA_TraCE21k_bio12.txt", header = F) %>%
   lapply(function(x) paste0("/vsicurl/", x)) %>%
-  lapply(rast) %>% 
+  pblapply(rast) %>% 
   rast()
 # Rename precipitation layers
 names(CHELSA_precip) <- names(CHELSA_precip) %>% parse_year("bio12", "precip")
@@ -87,24 +98,18 @@ cat("done.\n")
 
 # Digital elevation model
 cat("Loading DEM data...")
-CHELSA_dem <- read.csv("source_data/CHELSA_TraCE21k_dem.txt") %>%
+CHELSA_dem <- read.csv("source_data/CHELSA_TraCE21k_dem.txt", header = F) %>%
   lapply(function(x) paste0("/vsicurl/", x)) %>%
-  lapply(rast) %>% 
+  pblapply(rast) %>% 
   rast()
 # Rename dem layers
 names(CHELSA_dem) <- names(CHELSA_dem) %>% parse_year("dem")
 cat("done.\n")  
 
 # Glacial extent
-cat("Loading glacial extent polygons")
-test <- st_read(paste0("/vsicurl/","https://chartercryodb.s3.eu-central-1.amazonaws.com/CHELSA_TraCE21_gle_geom/CHELSA_TraCE21k_gle_-101_V1.0.gpkg"))
-CHELSA_gle_files <- list.files("source_data/CHELSA_TraCE21_gle_geom/",
-                               full.names = T)
-CHELSA_gle <- CHELSA_gle_files %>%
-  lapply(read_sf) %>%
-  setNames(gsub(".*/(CHELSA_TraCE21k_gle_.*).gpkg", "\\1", CHELSA_gle_files))
-# Rename gle files
-names(CHELSA_gle) <- names(CHELSA_gle) %>% parse_year("gle")
+cat("Loading list of glacial extent polygons")
+CHELSA_gle_files <- read.csv("source_data/CHELSA_TraCE21k_gle_geom.txt", header = F) %>%
+  sapply(function(x) paste0("/vsicurl/", x)) 
 cat("done.\n")
 
 ## Load time-step look_up-table
@@ -121,7 +126,7 @@ look_up_year <- function(time_id_vect){
 
 # Temperature
 cat("Extracting temperature values...")
-croy_db_new_extract <- terra::extract(CHELSA_temp, coords_to_extract) %>% 
+cryo_db_new_extract <- terra::extract(CHELSA_temp, coords_to_extract) %>% 
   pivot_longer(2:ncol(.), 
                               names_to = "year_kBP", 
                               values_to = "CHELSA_TraCE21k_temp") %>% 
@@ -131,65 +136,132 @@ cat("done.\n")
 
 # Precipitation
 cat("Extracting precipitation values...")
-croy_db_new_extract <- terra::extract(CHELSA_precip, coords_to_extract) %>% 
+cryo_db_new_extract <- terra::extract(CHELSA_precip, coords_to_extract) %>% 
   pivot_longer(2:ncol(.), 
                names_to = "year_kBP", 
                values_to = "CHELSA_TraCE21k_precip") %>% 
   mutate(year_kBP = gsub("precip_", "", year_kBP)) %>%
   mutate(year_kBP = look_up_year(year_kBP)) %>%
-  full_join(croy_db_new_extract, .)
+  full_join(cryo_db_new_extract, .)
 cat("done.\n")  
 
 # Elevation
 cat("Extracting elevation values...")
-croy_db_new_extract <- terra::extract(CHELSA_dem, coords_to_extract) %>% 
+cryo_db_new_extract <- terra::extract(CHELSA_dem, coords_to_extract) %>% 
   pivot_longer(2:ncol(.), 
                names_to = "year_kBP", 
-               values_to = "CHESA_TraCE21k_elevation") %>% 
+               values_to = "CHELSA_TraCE21k_elevation") %>% 
   mutate(year_kBP = gsub("dem_", "", year_kBP)) %>%
   mutate(year_kBP = look_up_year(year_kBP)) %>%
-  full_join(croy_db_new_extract, .)
+  full_join(cryo_db_new_extract, .)
 cat("done.\n")  
 
 # Calculate distance to land ice
-cat("Calculating distance glaciers...")
+cat("Calculating distance to glaciers...")
 
-# Helper function for distance calculation
-croy_db_new_extract <- pblapply(seq_along(CHELSA_gle),
+# Convert coordinates to extract to sf object
+coords_to_extract_sf <- st_as_sf(coords_to_extract)
+
+# Export helper funcitons and variables if needed
+if(Sys.info()['sysname'] == "Windows"){
+  clusterExport(cl, c("CHELSA_gle_files",
+                  "coords_to_extract_sf",
+                  "parse_year"))
+} 
+
+# Distance calculation
+cryo_db_new_extract <- pblapply(seq_along(CHELSA_gle_files),
        function(index){
-         # Convert coordinates to extract
-         coords_to_extract_sf <- st_as_sf(coords_to_extract)
+         cat(gsub(".*/(CHELSA_TraCE21k_gle_.*).gpkg", "\\1", 
+              CHELSA_gle_files[index]), "\n")
+         # Load geometries (remotely)
+         CHELSA_gle <- read_sf(CHELSA_gle_files[index]) %>%
+           st_make_valid()
          # Get distances
          coords_to_extract_sf$CHESA_TraCE21k_dist_to_land_ice <- 
-           st_distance(coords_to_extract_sf, CHELSA_gle[[index]]) %>%
+           st_distance(coords_to_extract_sf, CHELSA_gle) %>%
            as.numeric()
-         # Add year
-         coords_to_extract_sf$year_kBP <- names(CHELSA_gle)[[index]]
+         # Parse and add year
+         coords_to_extract_sf$year_kBP <- 
+           gsub(".*/(CHELSA_TraCE21k_gle_.*).gpkg", "\\1", 
+                CHELSA_gle_files[index]) %>% 
+           parse_year("gle")
          # Return as data frame
          coords_to_extract_sf %>%
            st_drop_geometry() %>%
            select(-LonDD, LatDD) %>%
            return()
-       }) %>%
+       }
+       ,cl = cl
+       ) %>%
   reduce(full_join) %>%
   mutate(year_kBP = gsub("gle_", "", year_kBP)) %>%
   mutate(year_kBP = look_up_year(year_kBP)) %>%
-  full_join(croy_db_new_extract, .)
+  full_join(cryo_db_new_extract, .)
 cat("done.\n")
 
-# # Calculate dates last glaciated and date last below sea-level
-# croy_db_new_extract <- croy_db_new_extract %>%
-#   group_by(id) %>%
-  
-## Add coordinates
-croy_db_new_extract <- coords_to_extract %>%
+# Calculate dates last glaciated 
+cat("Calculating dates last glaciated...")
+cryo_db_new_extract <- pblapply(seq_along(unique(cryo_db_new_extract$ID)),
+                              function(id){
+                                # filter data by ID
+                                data_sub <- filter(cryo_db_new_extract, ID == id)
+                                # Get years glaciated
+                                data_sub <- filter(data_sub, CHESA_TraCE21k_dist_to_land_ice == 0)
+                                # Calculate max year glaciated and return as data frame for merging
+                                return(data.frame(
+                                  ID = id,
+                                  CHELSA_TraCE21k_max_year_kBP_glaciated = 
+                                    max(data_sub$year_kBP)
+                                ))
+                              }) %>%
+  bind_rows() %>%
+  full_join(cryo_db_new_extract, .)
+cat("done.\n")
+
+# Calculate date last below sea level
+cat("Calculating dates last below sea-level")
+cryo_db_new_extract <- pblapply(seq_along(unique(cryo_db_new_extract$ID)),
+       function(id){
+         # filter data by ID
+         data_sub <- filter(cryo_db_new_extract, ID == id)
+         # Filter out years below sea-level
+         data_sub <- filter(data_sub, CHELSA_TraCE21k_elevation < 0)
+         # Calculate max year below sea-level and return as dataframe for merging
+         return(data.frame(
+           ID = id,
+           CHELSA_TraCE21k_max_year_kBP_with_elev_below_sea_level = 
+             suppressWarnings(max(data_sub$year_kBP))
+         ))
+       }) %>%
+  bind_rows() %>%
+  full_join(cryo_db_new_extract, .)
+cat("done.\n")
+
+## Add coordinates and remove ID
+cat("Adding coordinates...")
+cryo_db_new_extract <- coords_to_extract %>%
   st_as_sf() %>%
   st_drop_geometry() %>%
   select(ID, LonDD, LatDD) %>%
-  full_join(croy_db_new_extract)
+  full_join(cryo_db_new_extract) %>%
+  select(-ID)
+cat("done.\n")
 
 ## Merge with existing data
-cryo_db <- bind_rows(croy_db_new_extract)
-
+cat("Merging with existing cryo_db...")
+cryo_db <- bind_rows(cryo_db,
+                     cryo_db_new_extract)
 ## Update database
 write_csv(cryo_db, "cryo_db.csv")
+cat("done.\n")
+
+## Shut down parallel environment if needed
+if(Sys.info()['sysname'] == "Windows"){
+  stopCluster(cl)
+} 
+
+# Status
+cat("cryo_db update complete.\n")
+
+## EOF
