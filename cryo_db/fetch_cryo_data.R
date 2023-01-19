@@ -9,7 +9,10 @@ cat("Loading packages...")
 library(terra)
 library(sf)
 library(pbapply)
-library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(purrr)
 library(parallel)
 
 # Set up parallel environment
@@ -175,8 +178,7 @@ cryo_db_new_extract <- pblapply(seq_along(CHELSA_gle_files),
          cat(gsub(".*/(CHELSA_TraCE21k_gle_.*).gpkg", "\\1", 
               CHELSA_gle_files[index]), "\n")
          # Load geometries (remotely)
-         CHELSA_gle <- read_sf(CHELSA_gle_files[index]) %>%
-           st_make_valid()
+         CHELSA_gle <- read_sf(CHELSA_gle_files[index])
          # Get distances
          coords_to_extract_sf$CHESA_TraCE21k_dist_to_land_ice <- 
            st_distance(coords_to_extract_sf, CHELSA_gle) %>%
