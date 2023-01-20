@@ -20,6 +20,9 @@
 # RStudio files
 .Rproj.user/
 
+# Rproject files
+*.Rproj
+
 # produced vignettes
 vignettes/*.html
 vignettes/*.pdf
@@ -37,3 +40,6 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+# Local cryodb source data
+cryo_db/source_data/CHELSA_TraCE21_gle_geom/

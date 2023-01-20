@@ -11,8 +11,11 @@ library(pbapply)
 library(parallel)
 library(sf)
 
+# To be run relative to cryo_db folder
+# setwd("cryo_db")
+
 # Load list of CHELSA gle files and prep for remote access
-CHELSA_gle <- read.csv("scratch/CHELSA_TraCE21k_gle.txt",
+CHELSA_gle <- read.csv("source_data/CHELSA_TraCE21k_gle.txt",
                        header = F) %>%
   sapply(function(x) paste0("/vsicurl/", x)) 
 
@@ -25,7 +28,7 @@ pblapply(CHELSA_gle,
            x <- as.polygons(x)
            # Write out as gpkg
            writeVector(x,
-                       paste0("scratch/", 
+                       paste0("source_data/CHELSA_TraCE21_gle_geom/", 
                               names(x),
                               ".gpkg"),
                        overwrite = TRUE)
