@@ -15,7 +15,7 @@ library(readr)
 library(purrr)
 library(parallel)
 
-# Set up parallel environment
+# Set up parallel environment (note core detection is not always reliable)
 if(Sys.info()['sysname'] == "Windows"){
   cl <- makeCluster(detectCores() - 1)
   clusterEvalQ(cl, library(terra))
@@ -24,10 +24,9 @@ if(Sys.info()['sysname'] == "Windows"){
 } else {
   cl <- detectCores() - 1
 }
-
 cat("done.\n")
 
-# Work relative to cryo_db folder
+# Work relative to cryo_db folder (run this if executing locally)
 # setwd("cryo_db") 
 
 ## Load site coordinates from ahbddb.txt
@@ -141,7 +140,8 @@ cryo_db_new_extract <- terra::extract(CHELSA_temp, coords_to_extract) %>%
                               names_to = "year_kBP", 
                               values_to = "CHELSA_TraCE21k_temp") %>% 
   mutate(year_kBP = gsub("temp_", "", year_kBP)) %>%
-  mutate(year_kBP = look_up_year(year_kBP))
+  mutate(year_kBP = look_up_year(year_kBP)) %>% 
+  arrange(ID, year_kBP)
 cat("done.\n")  
 
 # Precipitation
@@ -258,14 +258,17 @@ cryo_db_new_extract <- coords_to_extract %>%
   select(-ID)
 cat("done.\n")
 
-## Merge with existing data
+## Merge with existing data (if it exist)
 cat("Merging with existing cryo_db...")
+if(exists("cryo_db")){
 cryo_db <- bind_rows(cryo_db,
                      cryo_db_new_extract)
-## Update database (if it exist)
-if(file.exists("cryo_db.csv")){
-  write_csv(cryo_db, "cryo_db.csv")
+} else {
+  cryo_db <- cryo_db_new_extract
 }
+
+## Write / update database
+write_csv(cryo_db, "cryo_db.csv")
 cat("done.\n")
 
 ## Shut down parallel environment if needed
