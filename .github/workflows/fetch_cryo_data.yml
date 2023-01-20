@@ -37,7 +37,7 @@ jobs:
     # - name: Run cryo data R script
     #   working-directory: cryo_db
     #   run: Rscript fetch_cryo_data.R
-
+    
     - name: Commit and push new cryo_db version
       - uses: actions/checkout@v3
       - run: |
