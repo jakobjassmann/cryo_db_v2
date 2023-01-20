@@ -46,33 +46,21 @@ visualisation/
 
 The time-series have century time-steps expressed in 1000 years before 1990 (**year kBP**).
 
-<br>
-
 **CHELSA_TraCE21k_temp** - Annual mean temperature in °C.
 
 - Cell values of the CHELSA_TraCE21k_bio01* raster files for a given location and centrury. 
 
-<br>
-
 **CHELSA_TraCE21k_precip** - Annual Precipitation in kg m-2 year-1.
 - Cell values of the CHELSA_TraCE21k_bio12* raster files for a given location and centrury. 
-
-<br>
 
 **CHELSA_TraCE21k_elevation** - Surface elevation above sea level in m.
 - Cell vlaues of the CHELSA_TraCE21k_glm raster files for a given location and centrury. 
 
-<br>
-
 **CHESA_TraCE21k_dist_to_land_ice** - Distance to nearest land ice in m. 
 - Calculated distance between location and glacial extent polygons derived from the CHELSA_TraCE21k_gle rasters for a given century.
 
-<br>
-
 **CHELSA_TraCE21k_max_year_kBP_glaciated** - Last time location was glaciated in 1000 yrs BP. 
 - Last centrury in the time-series where the location was glaciated (CHESA_TraCE21k_dist_to_land_ice == 0).
-
-<br>
 
 **CHELSA_TraCE21k_max_year_kBP_with_elev_below_sea_level** - Last time location was below sea-level in 1000 yrs BP. 
 - Last centrury in the time-series where the location was below sea-level (CHELSA_TraCE21k_elevation < 0).
@@ -93,13 +81,13 @@ The polygons of the glacial extent rasters can be generated using the `cryo_db/C
 
 **!!! Glacial extent data contains errors after 300 - 1990 CE !!!**
 
-The glacial extent data seems to be erroneous for the centruries 1600-0 years BP (after 300 CE). The CHESA_TraCE21k_dist_to_land_ice and CHELSA_TraCE21k_max_year_kBP_glaciated should be treated with care for those time steps. The source dataset is currently in review, I believe that future version of the dataset will address this issue.   
+The glacial extent data seems to contains errorss for the centruries 1600-0 years BP (after 300 CE). The CHESA_TraCE21k_dist_to_land_ice and CHELSA_TraCE21k_max_year_kBP_glaciated should be treated with care for those time steps. The source dataset is currently in review, I believe that future version of the dataset will address this issue.   
 
 ## Notes on performance and timeouts
 
 The slowest and most resource demanding step is the calculation of the `CHESA_TraCE21k_dist_to_land_ice` variable. 
 
-Processing of this step is implemented in parallel. However, it can take multiple hours to complete on the default GitHub runners. Consider a (local) powerful worker with plenty of resources to avoid the job to time out on the free GitHub runners (this will happen after 6h) for the first or subsequent large addition to the AHBDB database.  
+Processing of this step is implemented in parallel. However, it can take multiple hours to complete on the default GitHub runners. Consider a (local) powerful worker with plenty of resources to avoid a "time out" error on the free GitHub runners (this will happen after 6h). This could be useful for example, for the first or subsequent large addition to the AHBDB database.  
 
 ## Cryo Database Version 1
 
