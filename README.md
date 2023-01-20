@@ -19,19 +19,19 @@ In brief, the code:
 The repository also contains a GitHub action workflow that facilitates an 
 automated update of the database.
 
-Contact: [Jakob J. Assmann](mailto:jakob.assmann@uzh.ch)<br>
+Contact: Jakob J. Assmann, email: [jakob.assmann@uzh.ch](mailto:jakob.assmann@uzh.ch)<br>
 License: MIT <br>
-Date of readme: 20 January 2023
+Last update: 20 January 2023
 
 ## Folder structure
 
 ```
 .github/
     |- workflows/
-        |- fetch_cryo_data.yml             GitHub workflow for cryo db
-cryo_db/                                   cryo database files and scripts
-    |- source_data/                        links to source files and look up tables
-    |- CHELSA_TrACE21k_gle_rast_to_poly.R  Script to generate glacial polys
+        |- fetch_cryo_data.yml             GitHub workflow for generating the database
+cryo_db/                                   
+    |- source_data/                        url refs to source files and look up tables
+    |- CHELSA_TrACE21k_gle_rast_to_poly.R  script to generate glacial extent polys
     |- fetch_cryo_data.R                   SCRIPT FOR THE CRYO DATA EXTRACTION
     |- (cryo_db.csv)                       CRYO DATABASE (once generated)
 visualisation/
