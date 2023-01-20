@@ -79,15 +79,15 @@ The polygons of the glacial extent rasters can be generated using the `cryo_db/C
 
 ## Known issues with the data
 
-**!!! Glacial extent data contains errors after 300 - 1990 CE !!!**
+**!!! Glacial extent data contains errors 300 CE - 1990 CE !!!**
 
-The glacial extent data seems to contains errorss for the centruries 1600-0 years BP (after 300 CE). The CHESA_TraCE21k_dist_to_land_ice and CHELSA_TraCE21k_max_year_kBP_glaciated should be treated with care for those time steps. The source dataset is currently in review, I believe that future version of the dataset will address this issue.   
+The glacial extent data seems to contains errors for the centruries spanning 1.6k - 0 years BP (i.e., after 300 CE). The CHESA_TraCE21k_dist_to_land_ice and CHELSA_TraCE21k_max_year_kBP_glaciated should be treated with care for those time steps. The source dataset is currently in review, I believe that future version of the dataset might address this issue.   
 
 ## Notes on performance and timeouts
 
 The slowest and most resource demanding step is the calculation of the `CHESA_TraCE21k_dist_to_land_ice` variable. 
 
-Processing of this step is implemented in parallel. However, it can take multiple hours to complete on the default GitHub runners. Consider a (local) powerful worker with plenty of resources to avoid a "time out" error on the free GitHub runners (this will happen after 6h). This could be useful for example, for the first or subsequent large addition to the AHBDB database.  
+Processing of this step is implemented in parallel. However, it can take multiple hours to complete on the default GitHub runners. Consider a (local) powerful worker with plenty of resources to avoid a "time out" error on the free GitHub runners (this will happen after 6h). This could be useful for example, for the first processing or other subsequent large additions to the AHBDB database.  
 
 ## Cryo Database Version 1
 
