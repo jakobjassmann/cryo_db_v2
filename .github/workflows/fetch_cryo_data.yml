@@ -39,7 +39,6 @@ jobs:
     #   run: Rscript fetch_cryo_data.R
     #
     - name: Commit and push new cryo_db version
-      uses: actions/checkout@v3
       run: |
           date > cryo_db/test.csv
           git config user.name github-actions
