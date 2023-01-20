@@ -49,18 +49,25 @@ cat("done.\n")
 cat("Determining subest to extract...")
 
 # Load already extracted coordinates
-cryo_db <- read_csv("cryo_db.csv",
-                    show_col_types = FALSE) %>%
-  st_as_sf(coords = c("LonDD", "LatDD"), 
-           crs = 4326,
-           remove = F) 
+if(file.exists("cryo_db.csv")){
+  cryo_db <- read_csv("cryo_db.csv",
+                      show_col_types = FALSE) %>%
+    st_as_sf(coords = c("LonDD", "LatDD"), 
+             crs = 4326,
+             remove = F) 
+}
 
-# Determing subset of coordinates to extract
-coords_to_extract <- ahbdb %>%
-  filter(!(geometry %in% unique(cryo_db$geometry))) %>%
-  # Add unique ID column
-  mutate(ID = 1:nrow(.))
-
+# Determine subset of coordinates to extract
+if(exists("croy_db")){
+  coords_to_extract <- ahbdb %>%
+    filter(!(geometry %in% unique(cryo_db$geometry))) %>%
+    # Add unique ID column
+    mutate(ID = 1:nrow(.))
+} else {
+  coords_to_extract <- ahbdb %>%
+    # Add unique ID column
+    mutate(ID = 1:nrow(.))
+}
 cat("done.\n")
 
 # Status
@@ -191,10 +198,11 @@ cryo_db_new_extract <- pblapply(seq_along(CHELSA_gle_files),
          # Return as data frame
          coords_to_extract_sf %>%
            st_drop_geometry() %>%
-           select(-LonDD, LatDD) %>%
+           select(-LonDD, -LatDD) %>%
            return()
        }
-       ,cl = cl
+       # This takes a lot of resources, so run in parallel if possible
+       , cl = cl
        ) %>%
   reduce(full_join) %>%
   mutate(year_kBP = gsub("gle_", "", year_kBP)) %>%
@@ -254,8 +262,10 @@ cat("done.\n")
 cat("Merging with existing cryo_db...")
 cryo_db <- bind_rows(cryo_db,
                      cryo_db_new_extract)
-## Update database
-write_csv(cryo_db, "cryo_db.csv")
+## Update database (if it exist)
+if(file.exists("cryo_db.csv")){
+  write_csv(cryo_db, "cryo_db.csv")
+}
 cat("done.\n")
 
 ## Shut down parallel environment if needed
