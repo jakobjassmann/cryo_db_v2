@@ -41,10 +41,9 @@ jobs:
 
     - name: Commit and push new cryo_db version
       run: |
-          date > cryo_db/test.csv
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add cryo_db/test.csv
-          git commit -m "Updated test.csv"
+          git add cryo_db/cryo_db.csv
+          git commit -m "Updated cryo_db.csv"
           git push
       
